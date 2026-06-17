@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import re
 import shutil
+from typing import overload
 
 from .date_service import DateService
 from .exceptions import ImportValidationError, StorageError, ValidationError
@@ -21,6 +22,7 @@ from .models import (
     HabitData,
 )
 from .path_utils import get_runtime_database_path
+from .storage_backend import StorageBackend
 from .sqlite_storage_backend import SQLiteStorageBackend
 
 
@@ -39,7 +41,7 @@ class StorageManager:
         self.file_path = Path(file_path)
         self._date_service = date_service or DateService()
         self.database_path = Path(database_path) if database_path is not None else get_runtime_database_path()
-        self._sqlite_backend = SQLiteStorageBackend(self.database_path, date_service=self._date_service)
+        self._sqlite_backend: StorageBackend = SQLiteStorageBackend(self.database_path, date_service=self._date_service)
         self.last_warning: str | None = None
         self.created_default_on_load = False
 
@@ -97,6 +99,14 @@ class StorageManager:
         self._validate_hotkeys(data.get("hotkeys"))
         self._validate_completion_days(data["completion_days"])
 
+    @overload
+    def import_file(self, source_path: str) -> HabitData:
+        ...
+
+    @overload
+    def import_file(self, source_path: Path) -> HabitData:
+        ...
+
     def import_file(self, source_path: Path | str) -> HabitData:
         """Load and validate habit data from another file without changing current state."""
         source = Path(source_path)
@@ -104,6 +114,14 @@ class StorageManager:
             return self._read_valid_json_file(source)
         except (OSError, json.JSONDecodeError, ValidationError, ValueError) as error:
             raise ImportValidationError(f"Import failed for '{source}'.") from error
+
+    @overload
+    def export_file(self, destination_path: Path | str, habit_data: HabitData) -> None:
+        ...
+
+    @overload
+    def export_file(self, habit_data: HabitData, destination_path: Path | str) -> None:
+        ...
 
     def export_file(self, destination_path: Path | str | HabitData, habit_data: HabitData | Path | str) -> None:
         """Export the current habit data to a user-selected JSON file."""
