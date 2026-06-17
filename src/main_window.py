@@ -965,6 +965,7 @@ class MainWindow:
             self.about_page = AboutPage(
                 parent=self.root,
                 ui_font_family=self._ui_font_family,
+                header_font_path=self._header_font_path,
             )
         self.about_page.show()
 
@@ -980,6 +981,7 @@ class MainWindow:
             self.help_page = HelpPage(
                 parent=self.root,
                 ui_font_family=self._ui_font_family,
+                header_font_path=self._header_font_path,
             )
         self.help_page.show()
 

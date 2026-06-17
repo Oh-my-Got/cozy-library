@@ -1,6 +1,6 @@
-"""Prepare SQLite runtime storage for Cozy Library v2.
+"""Store Cozy Library data in a local SQLite database.
 
-Creates the local database schema while keeping current JSON storage unchanged.
+Implements StorageBackend and manages schema creation, loading, saving, and reset.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from .storage_backend import StorageBackend
 
 
 class SQLiteStorageBackend(StorageBackend):
-    """SQLite storage backend for future runtime persistence."""
+    """SQLite implementation of the storage backend interface."""
 
     SCHEMA_VERSION = "1"
 

@@ -1,5 +1,6 @@
 # Python cache
 __pycache__/
+pycache/
 *.py[cod]
 
 # Build artifacts
@@ -24,4 +25,7 @@ env/
 # Logs
 *.log
 
+# Local runtime databases
 *.db
+*.sqlite
+*.sqlite3

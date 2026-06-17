@@ -1,6 +1,6 @@
 """Define the storage backend interface for Cozy Library.
 
-Provides the abstract storage contract used by planned v2 persistence backends.
+Provides the interface-like contract used by runtime persistence backends.
 """
 
 from __future__ import annotations
