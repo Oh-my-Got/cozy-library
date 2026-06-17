@@ -11,11 +11,13 @@ import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 
 from .background_utils import render_background_view
+from .about_window import AboutPage
 from .date_service import DateService
 from .description_panel import DescriptionPanel
 from .exceptions import ImportValidationError, StorageError
 from .footer_view import FooterView
 from .header_view import HeaderView
+from .help_window import HelpPage
 from .layout import LayoutManager
 from .models import HabitData
 from .notification_service import NotificationService
@@ -113,6 +115,8 @@ class MainWindow:
 
         self.shelf_view: ShelfView | None = None
         self.statistics_window: StatisticsWindow | None = None
+        self.about_page: AboutPage | None = None
+        self.help_page: HelpPage | None = None
         self.settings_window: tk.Toplevel | None = None
         self._settings_dialog: SettingsDialog | None = None
         self._notification_job_id: str | None = None
@@ -365,6 +369,7 @@ class MainWindow:
         )
 
         self.root.bind("<Button-1>", self._handle_root_click_focus_out, add="+")
+        self.root.bind("<Escape>", self._close_overlay_page, add="+")
 
     def _build_menu(self) -> None:
         """Build file, settings, and view menus."""
@@ -386,6 +391,11 @@ class MainWindow:
         view_menu = tk.Menu(menu_bar, tearoff=False)
         view_menu.add_command(label="Detailed statistics", command=self.open_statistics_window)
         menu_bar.add_cascade(label="View", menu=view_menu)
+
+        help_menu = tk.Menu(menu_bar, tearoff=False)
+        help_menu.add_command(label="Help", command=self.open_help_window)
+        help_menu.add_command(label="About", command=self.open_about_window)
+        menu_bar.add_cascade(label="Help", menu=help_menu)
 
         self.root.config(menu=menu_bar)
 
@@ -910,6 +920,7 @@ class MainWindow:
         if self._is_exiting:
             return
         self._is_exiting = True
+        self._close_overlay_page()
         if self.settings_window is not None and self.settings_window.winfo_exists():
             self.settings_window.destroy()
         if self.statistics_window is not None and self.statistics_window.is_open():
@@ -941,6 +952,49 @@ class MainWindow:
             window_background_path=background_path,
             assets_root=self._assets_root,
         )
+
+    def open_about_window(self) -> None:
+        """Show the About page over the main window."""
+        if self.help_page is not None and self.help_page.is_open():
+            self.help_page.close()
+        if self.about_page is not None and self.about_page.is_open():
+            self.about_page.show()
+            return
+
+        if self.about_page is None:
+            self.about_page = AboutPage(
+                parent=self.root,
+                ui_font_family=self._ui_font_family,
+            )
+        self.about_page.show()
+
+    def open_help_window(self) -> None:
+        """Show the Help page over the main window."""
+        if self.about_page is not None and self.about_page.is_open():
+            self.about_page.close()
+        if self.help_page is not None and self.help_page.is_open():
+            self.help_page.show()
+            return
+
+        if self.help_page is None:
+            self.help_page = HelpPage(
+                parent=self.root,
+                ui_font_family=self._ui_font_family,
+            )
+        self.help_page.show()
+
+    def _close_overlay_page(self, event: tk.Event | None = None) -> str | None:
+        """Close Help or About overlay and return focus to the main window."""
+        closed = False
+        if self.about_page is not None and self.about_page.is_open():
+            self.about_page.close()
+            closed = True
+        if self.help_page is not None and self.help_page.is_open():
+            self.help_page.close()
+            closed = True
+        if closed:
+            return "break"
+        return None
 
     def _refresh_statistics_window_if_open(self) -> None:
         if self.statistics_window is None or not self.statistics_window.is_open():

@@ -5,12 +5,13 @@ Creates the local database schema while keeping current JSON storage unchanged.
 
 from __future__ import annotations
 
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 
 from .date_service import DateService
 from .exceptions import StorageError
-from .models import DEFAULT_HOTKEYS, HabitData
+from .models import DEFAULT_HOTKEYS, DEFAULT_NOTIFICATION_MESSAGE, HabitData
 from .storage_backend import StorageBackend
 
 
@@ -35,8 +36,9 @@ class SQLiteStorageBackend(StorageBackend):
         """Load habit data from SQLite, creating default data when empty."""
         self._ensure_schema()
         try:
-            with sqlite3.connect(self.database_path) as connection:
-                data = self._read_habit_data(connection)
+            with closing(sqlite3.connect(self.database_path)) as connection:
+                with connection:
+                    data = self._read_habit_data(connection)
         except (sqlite3.Error, ValueError) as error:
             raise StorageError(f"Could not load SQLite database '{self.database_path}'.") from error
 
@@ -50,8 +52,9 @@ class SQLiteStorageBackend(StorageBackend):
         """Save the complete habit state to SQLite."""
         self._ensure_schema()
         try:
-            with sqlite3.connect(self.database_path) as connection:
-                self._write_habit_data(connection, habit_data)
+            with closing(sqlite3.connect(self.database_path)) as connection:
+                with connection:
+                    self._write_habit_data(connection, habit_data)
         except (sqlite3.Error, ValueError) as error:
             raise StorageError(f"Could not save SQLite database '{self.database_path}'.") from error
 
@@ -65,50 +68,51 @@ class SQLiteStorageBackend(StorageBackend):
         """Create all v2 SQLite tables inside one transaction."""
         try:
             self.database_path.parent.mkdir(parents=True, exist_ok=True)
-            with sqlite3.connect(self.database_path) as connection:
-                connection.executescript(
-                    """
-                    CREATE TABLE IF NOT EXISTS app_metadata (
-                        key TEXT PRIMARY KEY,
-                        value TEXT NOT NULL
-                    );
+            with closing(sqlite3.connect(self.database_path)) as connection:
+                with connection:
+                    connection.executescript(
+                        """
+                        CREATE TABLE IF NOT EXISTS app_metadata (
+                            key TEXT PRIMARY KEY,
+                            value TEXT NOT NULL
+                        );
 
-                    CREATE TABLE IF NOT EXISTS habit (
-                        id INTEGER PRIMARY KEY CHECK (id = 1),
-                        habit_description TEXT NOT NULL,
-                        created_at TEXT NOT NULL,
-                        last_opened_at TEXT NOT NULL,
-                        startup_enabled INTEGER NOT NULL CHECK (startup_enabled IN (0, 1))
-                    );
+                        CREATE TABLE IF NOT EXISTS habit (
+                            id INTEGER PRIMARY KEY CHECK (id = 1),
+                            habit_description TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            last_opened_at TEXT NOT NULL,
+                            startup_enabled INTEGER NOT NULL CHECK (startup_enabled IN (0, 1))
+                        );
 
-                    CREATE TABLE IF NOT EXISTS completion_days (
-                        date_key TEXT PRIMARY KEY,
-                        completed INTEGER NOT NULL CHECK (completed IN (0, 1))
-                    );
+                        CREATE TABLE IF NOT EXISTS completion_days (
+                            date_key TEXT PRIMARY KEY,
+                            completed INTEGER NOT NULL CHECK (completed IN (0, 1))
+                        );
 
-                    CREATE TABLE IF NOT EXISTS notification_settings (
-                        id INTEGER PRIMARY KEY CHECK (id = 1),
-                        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
-                        message_template TEXT NOT NULL
-                    );
+                        CREATE TABLE IF NOT EXISTS notification_settings (
+                            id INTEGER PRIMARY KEY CHECK (id = 1),
+                            enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+                            message_template TEXT NOT NULL
+                        );
 
-                    CREATE TABLE IF NOT EXISTS notification_times (
-                        time_value TEXT PRIMARY KEY
-                    );
+                        CREATE TABLE IF NOT EXISTS notification_times (
+                            time_value TEXT PRIMARY KEY
+                        );
 
-                    CREATE TABLE IF NOT EXISTS hotkey_settings (
-                        action TEXT PRIMARY KEY,
-                        keysym TEXT NOT NULL
-                    );
-                    """
-                )
-                connection.execute(
-                    """
-                    INSERT OR REPLACE INTO app_metadata (key, value)
-                    VALUES ('schema_version', ?)
-                    """,
-                    (self.SCHEMA_VERSION,),
-                )
+                        CREATE TABLE IF NOT EXISTS hotkey_settings (
+                            action TEXT PRIMARY KEY,
+                            keysym TEXT NOT NULL
+                        );
+                        """
+                    )
+                    connection.execute(
+                        """
+                        INSERT OR REPLACE INTO app_metadata (key, value)
+                        VALUES ('schema_version', ?)
+                        """,
+                        (self.SCHEMA_VERSION,),
+                    )
         except (OSError, sqlite3.Error) as error:
             raise StorageError(f"Could not initialize SQLite database '{self.database_path}'.") from error
 
@@ -131,7 +135,7 @@ class SQLiteStorageBackend(StorageBackend):
             """
         ).fetchone()
         notification_enabled = False
-        message_template = "Today's habit: {habit}"
+        message_template = DEFAULT_NOTIFICATION_MESSAGE
         if notification_row is not None:
             notification_enabled = bool(notification_row[0])
             message_template = notification_row[1]
@@ -139,7 +143,7 @@ class SQLiteStorageBackend(StorageBackend):
         notification_times = [
             row[0]
             for row in connection.execute(
-                "SELECT time_value FROM notification_times ORDER BY time_value"
+                "SELECT time_value FROM notification_times ORDER BY rowid"
             ).fetchall()
         ]
         completion_days = {
