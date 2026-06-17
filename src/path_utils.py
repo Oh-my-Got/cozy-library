@@ -49,6 +49,11 @@ def get_runtime_data_path() -> Path:
     return get_runtime_data_dir() / "habit_data.json"
 
 
+def get_runtime_database_path() -> Path:
+    """Return the writable SQLite database path for v2 storage."""
+    return get_runtime_data_dir() / "cozy_library.db"
+
+
 def migrate_legacy_runtime_data() -> None:
     """Move legacy runtime data into the current app data directory when needed."""
     target_dir = get_runtime_data_dir()
